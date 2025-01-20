@@ -1,6 +1,6 @@
 use chorus::errors::ChorusResult;
 use chorus::instance::{ChorusUser, Instance};
-use chorus::types::Guild;
+use chorus::types::{GatewayReady, Guild, Snowflake};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -11,12 +11,16 @@ pub enum Message {
     PasswordUpdate(String),
     InstanceUrlUpdate(String),
     SubmitLogin,
-    LoginSuccess(Instance, ChorusUser),
+    LoginSuccess(Instance, ChorusUser, Option<Vec<Guild>>),
+    LogoutCleanup,
     Logout,
-    SwitchChannel(String),
+    SwitchGuild(Snowflake),
+    SwitchChannel(Snowflake),
     MessageInputUpdate(String),
     SendMessage,
-
-    GuildsFetched(ChorusResult<Vec<Guild>>),
-    FetchGuilds
+    MessageSent,
+    UpdateGuilds(Vec<Guild>),
+    UpdateChannels(Vec<Snowflake>),
+    UpdateMessages(Vec<String>),
+    ReadyRecieved(GatewayReady),
 }
