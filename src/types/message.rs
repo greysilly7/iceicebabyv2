@@ -1,6 +1,5 @@
-use chorus::errors::ChorusResult;
 use chorus::instance::{ChorusUser, Instance};
-use chorus::types::{GatewayReady, Guild, Snowflake};
+use chorus::types::{GatewayReady, Guild, MessageCreate, Snowflake};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -21,6 +20,7 @@ pub enum Message {
     MessageSent,
     UpdateGuilds(Vec<Guild>),
     UpdateChannels(Vec<Snowflake>),
-    UpdateMessages(Vec<String>),
-    ReadyRecieved(GatewayReady),
+    UpdateMessages(Vec<chorus::types::Message>),
+    ReadyReceived(GatewayReady),
+    MessageCreateReceived(MessageCreate),
 }

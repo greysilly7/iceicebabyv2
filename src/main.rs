@@ -6,10 +6,10 @@ mod subscriptions;
 use std::string::String;
 use chorus::instance::ChorusUser;
 use chorus::instance::Instance;
-use chorus::types::{Guild, LoginSchema, MessageSendSchema, Snowflake};
-use log::{info, LevelFilter};
+use chorus::types::{Channel, GetChannelMessagesSchema, Guild, LoginSchema, MessageSendSchema, Snowflake};
+use log::{debug, info, warn, LevelFilter};
 use std::default::Default;
-use iced::{Task, Theme};
+use iced::{Subscription, Task, Theme};
 use crate::types::message::Message;
 
 #[derive(Clone)]
@@ -23,7 +23,8 @@ struct App {
     current_guild: Option<Snowflake>,
     current_channel: Option<Snowflake>,
     message_input: String,
-    guilds: Option<Vec<Guild>>
+    guilds: Option<Vec<Guild>>,
+    messages: Option<Vec<chorus::types::Message>>
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -51,6 +52,7 @@ impl App {
             current_guild: None,
             message_input: String::default(),
             guilds: None,
+            messages: None,
         }
     }
 
@@ -119,10 +121,9 @@ impl App {
             Message::SendMessage => {
                 let message = self.message_input.clone();
                 let current_channel = self.current_channel;
-                let current_guild = self.current_guild;
                 let user = self.user.clone();
                 let send_message = async move {
-                    if let (Some(current_channel), Some(current_guild), Some(mut user)) = (current_channel, current_guild, user) {
+                    if let (Some(current_channel), Some(mut user)) = (current_channel, user) {
                         user.send_message(
                             MessageSendSchema {
                                 content: Some(message.clone()),
@@ -137,7 +138,7 @@ impl App {
             Message::MessageInputUpdate(message) => {
                 self.message_input = message;
             },
-            Message::ReadyRecieved(ready_event) => {
+            Message::ReadyReceived(ready_event) => {
                 // self.guilds = Some(ready_event.guilds.clone());
                 info!("Ready event processed: ${:?}", ready_event);
             },
@@ -156,14 +157,86 @@ impl App {
             }
             Message::UpdateMessages(messages) => {
                 // Optional: Add logic to update messages
+                self.messages = Some(messages.clone());
                 info!("Updated messages: {:?}", messages);
             }
             Message::MessageSent => {
                 self.message_input = String::default();
             }
-        }
+            Message::MessageCreateReceived(message_create) => {
+                info!("Message received: {:?}", message_create);
 
-        Task::none()
+                // Step 1: Check if the user is logged in
+                let current_user = match self.user.clone() {
+                    Some(user) => user,
+                    None => {
+                        warn!("Received a message, but no user is logged in.");
+                        return Task::none(); // Skip if no user is logged in
+                    }
+                };
+
+                // Step 2: Check if we're in a guild and channel
+                let (current_guild, current_channel) = match (self.current_guild, self.current_channel) {
+                    (Some(guild), Some(channel)) => (guild, channel),
+                    _ => {
+                        warn!("Received a message, but the current guild or channel is missing.");
+                        return Task::none(); // Skip if guild or channel is missing
+                    }
+                };
+
+                // Step 3: Check if the message came from another user
+                let message_author_id_result = message_create
+                    .member
+                    .as_ref()
+                    .and_then(|member| member.user.as_ref())
+                    .and_then(|user| user.read().ok())
+                    .map(|user| user.id);
+
+                let message_author_id = match message_author_id_result {
+                    Some(id) => id,
+                    None => {
+                        warn!("Could not retrieve the message author's ID.");
+                        return Task::none(); // Skip if author information is invalid
+                    }
+                };
+
+                if message_author_id == current_user.object.read().unwrap().id {
+                    debug!("Received a message from the current user. Ignoring.");
+                    return Task::none(); // Skip if the message is from the current user
+                }
+
+                // Step 4: Fetch messages asynchronously and fire the update
+                return Task::chain(
+                    {
+                        let user = self.user.clone();
+                        Task::perform(
+                            async move {
+                                if let Some(mut chorus_user) = user {
+                                    // Fetch channel messages
+                                    Channel::messages(
+                                        GetChannelMessagesSchema::before(Snowflake::generate()),
+                                        current_channel,
+                                        &mut chorus_user,
+                                    )
+                                        .await
+                                        .unwrap_or_else(|err| {
+                                            warn!("Failed to fetch messages: {:?}", err);
+                                            Vec::new() // Default to an empty message list on failure
+                                        })
+                                } else {
+                                    warn!("User context disappeared while processing messages.");
+                                    Vec::new()
+                                }
+                            },
+                            |messages| Message::UpdateMessages(messages), // Pass messages to the `UpdateMessages` event
+                        )
+                    },
+                    Task::none()
+                );
+            }
+    }
+
+    Task::none()
     }
 
     fn view(&self) -> iced::Element<Message> {
@@ -174,10 +247,13 @@ impl App {
         }
     }
 
-    fn subscription(&self) -> iced::Subscription<Message> {
-        // Only activate the ready_event subscription if the user is logged in
+    fn subscription(&self) -> Subscription<Message> {
         if self.user.is_some() {
-            subscriptions::ready_event::ready_event(self.clone())
+            return Subscription::batch(vec![
+                subscriptions::ready_event::ready_event(self.clone()),
+                subscriptions::message_create::message_create_event(
+                    self.clone())
+            ]);
         } else {
             iced::Subscription::none()
         }
@@ -196,7 +272,7 @@ async fn main() -> Result<(), iced::Error> {
     iced::application("iceicebabyv2", App::update, App::view)
         .theme(|_state| Theme::CatppuccinMocha)
         .subscription(App::subscription)
-        .run_with(|| (App::new(), iced::Task::none()))
+        .run_with(|| (App::new(), Task::none()))
 
 }
 

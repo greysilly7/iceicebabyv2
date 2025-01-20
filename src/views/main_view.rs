@@ -69,7 +69,7 @@ pub fn main_view(app: &App) -> iced::widget::Container<Message> {
         .height(Length::Fill)
         .width(Length::Fixed(240.0));
 
-    let chat_area = if let (Some(current_channel), Some(current_guild)) = (app.current_channel, app.current_guild) {
+    let chat_area = if let Some(current_channel) = app.current_channel {
         // Only fetch messages if the current channel and guild exist
         let messages = futures::executor::block_on(
             Channel::messages(

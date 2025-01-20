@@ -33,7 +33,7 @@ pub fn ready_event(app: App) -> Subscription<Message> {
 
         // Forward GatewayReady events from the receiver to the output stream
         while let Some(event) = receiver.next().await {
-            if let Err(err) = output.send(Message::ReadyRecieved(event)).await {
+            if let Err(err) = output.send(Message::ReadyReceived(event)).await {
                 log::error!("Failed to send ReadyReceived message: {}", err);
                 break; // Stop stream processing on error
             }

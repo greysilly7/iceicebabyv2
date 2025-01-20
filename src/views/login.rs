@@ -3,7 +3,7 @@ use iced::{Alignment, Length};
 
 use crate::{types, App};
 
-pub fn login_view<'a>(app: &'a App) -> iced::widget::Container<'a, types::message::Message> {
+pub fn login_view(app: &App) -> iced::widget::Container<types::message::Message> {
     let body = column![
         text("Login")
             .size(40)
