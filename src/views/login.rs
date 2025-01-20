@@ -15,7 +15,8 @@ pub fn login_view(app: &App) -> iced::widget::Container<types::message::Message>
         Space::with_height(Length::Fixed(10.0)),
         text_input("Password", &app.password)
             .padding(10)
-            .on_input(types::message::Message::PasswordUpdate),
+            .on_input(types::message::Message::PasswordUpdate)
+            .secure(true),
         Space::with_height(Length::Fixed(10.0)),
         text_input("Instance URL", &app.instance_url)
             .padding(10)

@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use chorus::types::{GatewayReady, MessageCreate};
+use chorus::types::MessageCreate;
 use iced::futures::{StreamExt, channel::mpsc, SinkExt};
 use iced::{stream, Subscription};
 use crate::types::message::Message;
